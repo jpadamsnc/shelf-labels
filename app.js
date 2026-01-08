@@ -415,7 +415,23 @@ function getPriceDisplay(item) {
 }
 
 function setupEventListeners() {
-    searchInput.addEventListener('input', (e) => filterItems(e.target.value));
+    const clearBtn = document.getElementById('clearSearchBtn');
+
+    searchInput.addEventListener('input', (e) => {
+        filterItems(e.target.value);
+        if (clearBtn) {
+            clearBtn.style.display = e.target.value ? 'block' : 'none';
+        }
+    });
+
+    if (clearBtn) {
+        clearBtn.addEventListener('click', () => {
+            searchInput.value = '';
+            filterItems('');
+            clearBtn.style.display = 'none';
+            searchInput.focus();
+        });
+    }
 
     const customBtn = document.getElementById('customBtn');
     if (customBtn) {
