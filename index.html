@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shelf Label Printer</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <!-- Styles -->
+    <link rel="stylesheet" href="styles.css">
+    <!-- PapaParse for CSV -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+</head>
+
+<body>
+
+    <div class="app-container">
+        <header class="app-header">
+            <h1>Shelf Labels</h1>
+            <div class="search-container">
+                <input type="text" id="searchInput" placeholder="Search items..." autocomplete="off">
+                <button id="uploadBtn" class="print-btn"
+                    style="padding: 0.5rem 1rem; width: auto; margin-left: 0.5rem; font-size: 1rem; background-color: #4b5563;">Load
+                    List</button>
+                <input type="file" id="csvFileInput" accept=".csv" style="display: none;">
+                <button id="customBtn" class="print-btn"
+                    style="padding: 0.5rem 1rem; width: auto; margin-left: 0.5rem; font-size: 1rem;">Custom
+                    Label</button>
+            </div>
+        </header>
+
+        <main class="item-grid" id="itemGrid">
+            <!-- Items injected here -->
+        </main>
+
+        <!-- Hidden by default, shown when item selected -->
+        <div id="previewModal" class="modal hidden">
+            <div class="modal-content">
+                <span class="close-btn" id="closeModal">&times;</span>
+                <h2>Preview Label</h2>
+                <div class="label-preview-container" id="labelPreview">
+                    <!-- Label content injected here -->
+                    <div class="print-label" id="printableLabel">
+                        <img src="Fuster-Cluck-Logo-Black.jpg" class="print-logo" alt="Fuster Cluck Farm">
+                        <h1 class="label-title" id="pTitle" contenteditable="true" spellcheck="false">Item Name</h1>
+                        <div class="label-price" id="pPrice" contenteditable="true" spellcheck="false">$0.00</div>
+                        <div class="label-unit" id="pUnit" contenteditable="true" spellcheck="false">per unit</div>
+                    </div>
+                </div>
+                <button class="print-btn" id="printBtn">Print Label</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>
