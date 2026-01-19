@@ -268,11 +268,29 @@ const pTitle = document.getElementById('pTitle');
 const pPrice = document.getElementById('pPrice');
 const pUnit = document.getElementById('pUnit');
 
+// PrintNode State
+let printNodeApiKey = '';
+let printNodePrinterId = '';
+
+// Settings Elements
+const settingsModal = document.getElementById('settingsModal');
+const settingsBtn = document.getElementById('settingsBtn');
+const closeSettingsModal = document.getElementById('closeSettingsModal');
+const saveSettingsBtn = document.getElementById('saveSettingsBtn');
+const apiKeyInput = document.getElementById('apiKeyInput');
+const printerIdInput = document.getElementById('printerIdInput');
+
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
+    loadSettings();
     fetchCDF();
     setupEventListeners();
 });
+
+function loadSettings() {
+    printNodeApiKey = localStorage.getItem('printNodeApiKey') || '';
+    printNodePrinterId = localStorage.getItem('printNodePrinterId') || '';
+}
 
 function fetchCDF() {
     // Check if running locally via file://
@@ -483,14 +501,30 @@ function setupEventListeners() {
         modal.classList.add('hidden');
     });
 
+    // Settings Modal Listeners
+    if (settingsBtn) {
+        settingsBtn.addEventListener('click', openSettings);
+    }
+    if (closeSettingsModal) {
+        closeSettingsModal.addEventListener('click', () => {
+            settingsModal.classList.add('hidden');
+        });
+    }
+    if (saveSettingsBtn) {
+        saveSettingsBtn.addEventListener('click', saveSettings);
+    }
+
     // Close on click outside
     window.addEventListener('click', (e) => {
         if (e.target == modal) {
             modal.classList.add('hidden');
         }
+        if (e.target == settingsModal) {
+            settingsModal.classList.add('hidden');
+        }
     });
 
-    document.getElementById('printBtn').addEventListener('click', () => window.print());
+    document.getElementById('printBtn').addEventListener('click', handlePrint);
 }
 
 function openCustomLabel() {
@@ -507,4 +541,96 @@ function openCustomLabel() {
         // select all text
         document.execCommand('selectAll', false, null);
     }, 50);
+}
+
+function openSettings() {
+    apiKeyInput.value = printNodeApiKey;
+    printerIdInput.value = printNodePrinterId;
+    settingsModal.classList.remove('hidden');
+}
+
+function saveSettings() {
+    printNodeApiKey = apiKeyInput.value.trim();
+    printNodePrinterId = printerIdInput.value.trim();
+
+    localStorage.setItem('printNodeApiKey', printNodeApiKey);
+    localStorage.setItem('printNodePrinterId', printNodePrinterId);
+
+    alert('Settings Saved!');
+    settingsModal.classList.add('hidden');
+}
+
+async function handlePrint() {
+    if (printNodeApiKey && printNodePrinterId) {
+        await printViaPrintNode();
+    } else {
+        window.print();
+    }
+}
+
+async function printViaPrintNode() {
+    const printBtn = document.getElementById('printBtn');
+    const originalText = printBtn.textContent;
+    printBtn.textContent = 'Printing...';
+    printBtn.disabled = true;
+
+    try {
+        const element = document.getElementById('printableLabel');
+
+        // Capture HTML to Canvas
+        const canvas = await html2canvas(element, {
+            scale: 4, // Higher scale for better resolution
+            useCORS: true,
+            backgroundColor: '#ffffff'
+        });
+
+        const imgData = canvas.toDataURL('image/png');
+
+        // Create PDF
+        // Label size: 4in x 3in (per CSS)
+        // Adjust for jsPDF (points or inches). 
+        // 1 inch = 72 points
+        // 4 inch = 288 points
+        // 3 inch = 216 points
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF({
+            orientation: 'landscape',
+            unit: 'in',
+            format: [4, 3]
+        });
+
+        pdf.addImage(imgData, 'PNG', 0, 0, 4, 3);
+        const pdfBase64 = pdf.output('datauristring').split(',')[1];
+
+        // Send to PrintNode
+        const response = await fetch('https://api.printnode.com/printjobs', {
+            method: 'POST',
+            headers: {
+                'Authorization': 'Basic ' + btoa(printNodeApiKey + ':'),
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                printerId: parseInt(printNodePrinterId),
+                title: 'Shelf Label',
+                contentType: 'pdf_base64',
+                content: pdfBase64,
+                source: 'Shelf Labels App'
+            })
+        });
+
+        if (response.ok) {
+            alert('Print job sent to PrintNode!');
+        } else {
+            const errText = await response.text();
+            console.error('PrintNode Error:', errText);
+            alert('Failed to send print job. Check console for details.');
+        }
+
+    } catch (error) {
+        console.error('Printing Error:', error);
+        alert('An error occurred while printing.');
+    } finally {
+        printBtn.textContent = originalText;
+        printBtn.disabled = false;
+    }
 }
