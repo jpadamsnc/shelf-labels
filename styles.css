@@ -264,13 +264,27 @@ input[type="text"]:focus {
         margin: 0;
     }
 
-    body * {
-        visibility: hidden;
+    /* Hide all other content from flow to prevent blank pages */
+    .app-header,
+    .item-grid,
+    #settingsModal {
+        display: none !important;
     }
 
-    #previewModal,
-    #previewModal * {
+    /* Ensure body and container don't restrict size */
+    body,
+    html,
+    .app-container {
+        background: white;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+    }
+
+    #previewModal {
         visibility: visible;
+        display: block !important;
     }
 
     #previewModal {
