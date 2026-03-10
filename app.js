@@ -294,6 +294,18 @@ const saveSettingsBtn = document.getElementById('saveSettingsBtn');
 const apiKeyInput = document.getElementById('apiKeyInput');
 const printerIdInput = document.getElementById('printerIdInput');
 
+// Firebase Settings Elements
+const fbApiKeyInput = document.getElementById('fbApiKeyInput');
+const fbAuthDomainInput = document.getElementById('fbAuthDomainInput');
+const fbProjectIdInput = document.getElementById('fbProjectIdInput');
+const fbStorageBucketInput = document.getElementById('fbStorageBucketInput');
+const fbMessagingSenderIdInput = document.getElementById('fbMessagingSenderIdInput');
+const fbAppIdInput = document.getElementById('fbAppIdInput');
+
+// Firebase State
+let firebaseConfig = null;
+let db = null;
+
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
     loadSettings();
@@ -304,17 +316,62 @@ document.addEventListener('DOMContentLoaded', () => {
 function loadSettings() {
     printNodeApiKey = localStorage.getItem('printNodeApiKey') || '';
     printNodePrinterId = localStorage.getItem('printNodePrinterId') || '';
+    
+    const savedFbConfig = localStorage.getItem('firebaseConfig');
+    if (savedFbConfig) {
+        try {
+            firebaseConfig = JSON.parse(savedFbConfig);
+            initFirebase();
+        } catch(e) {
+            console.error("Error parsing saved Firebase config", e);
+        }
+    }
 }
 
-function fetchCDF() {
-    // Check if running locally via file://
+function initFirebase() {
+    if (!firebaseConfig || !firebaseConfig.apiKey) return;
+    
+    try {
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        db = firebase.firestore();
+        console.log("Firebase initialized successfully.");
+    } catch(e) {
+        console.error("Error initializing Firebase", e);
+    }
+}
+
+async function fetchCDF() {
+    // 1. Try Firebase First
+    if (db) {
+        try {
+            const docRef = db.collection("shelf_labels").doc("item_list");
+            const docSnap = await docRef.get();
+            
+            if (docSnap.exists) {
+                console.log("Loaded items from Firebase!");
+                const data = docSnap.data();
+                if (data.items && data.items.length > 0) {
+                    items = data.items;
+                    renderItems(items);
+                    return;
+                }
+            } else {
+                console.log("No items found in Firebase. Falling back to default list.");
+            }
+        } catch(e) {
+            console.error("Error loading from Firebase:", e);
+        }
+    }
+
+    // 2. Fallback to Local/Embedded Data
     if (window.location.protocol === 'file:') {
         console.warn('Running locally via file:// protocol. Using embedded fallback data.');
         parseCSV(FALLBACK_CSV);
         return;
     }
 
-    // Otherwise try to fetch the file (requires web server)
     Papa.parse(csvUrl, {
         download: true,
         header: true,
@@ -482,10 +539,31 @@ function setupEventListeners() {
             if (file) {
                 Papa.parse(file, {
                     header: true,
-                    complete: function (results) {
+                    complete: async function (results) {
                         handleParseResults(results);
-                        // Reset search
                         searchInput.value = '';
+                        
+                        // Auto-sync to Firebase if configured
+                        if (db && items.length > 0) {
+                            try {
+                                uploadBtn.textContent = 'Syncing...';
+                                uploadBtn.disabled = true;
+                                await db.collection("shelf_labels").doc("item_list").set({
+                                    items: items,
+                                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                                });
+                                console.log("Successfully synced list to Firebase!");
+                                alert("List successfully imported and synced to the cloud!");
+                            } catch(err) {
+                                console.error("Error syncing to Firebase:", err);
+                                alert("List imported locally, but failed to sync to the cloud.");
+                            } finally {
+                                uploadBtn.textContent = 'Load List';
+                                uploadBtn.disabled = false;
+                            }
+                        } else if (!db) {
+                            alert("List imported locally. Note: Cloud sync is not configured in Settings, so other devices won't see this new list.");
+                        }
                     },
                     error: function (err) {
                         console.error("Error parsing uploaded file:", err);
@@ -560,6 +638,16 @@ function openCustomLabel() {
 function openSettings() {
     apiKeyInput.value = printNodeApiKey;
     printerIdInput.value = printNodePrinterId;
+    
+    if (firebaseConfig) {
+        fbApiKeyInput.value = firebaseConfig.apiKey || '';
+        fbAuthDomainInput.value = firebaseConfig.authDomain || '';
+        fbProjectIdInput.value = firebaseConfig.projectId || '';
+        fbStorageBucketInput.value = firebaseConfig.storageBucket || '';
+        fbMessagingSenderIdInput.value = firebaseConfig.messagingSenderId || '';
+        fbAppIdInput.value = firebaseConfig.appId || '';
+    }
+
     settingsModal.classList.remove('hidden');
 }
 
@@ -569,6 +657,31 @@ function saveSettings() {
 
     localStorage.setItem('printNodeApiKey', printNodeApiKey);
     localStorage.setItem('printNodePrinterId', printNodePrinterId);
+    
+    // Save Firebase Config
+    const fbApiKey = fbApiKeyInput.value.trim();
+    if (fbApiKey) {
+        const newFbConfig = {
+            apiKey: fbApiKey,
+            authDomain: fbAuthDomainInput.value.trim(),
+            projectId: fbProjectIdInput.value.trim(),
+            storageBucket: fbStorageBucketInput.value.trim(),
+            messagingSenderId: fbMessagingSenderIdInput.value.trim(),
+            appId: fbAppIdInput.value.trim()
+        };
+        localStorage.setItem('firebaseConfig', JSON.stringify(newFbConfig));
+        
+        // Reload page to re-initialize firebase
+        if (!firebaseConfig || firebaseConfig.apiKey !== newFbConfig.apiKey) {
+            alert('Settings Saved! The page will now reload to apply Firebase changes.');
+            window.location.reload();
+            return;
+        }
+        firebaseConfig = newFbConfig;
+    } else {
+        localStorage.removeItem('firebaseConfig');
+        firebaseConfig = null;
+    }
 
     alert('Settings Saved!');
     settingsModal.classList.add('hidden');
