@@ -342,6 +342,13 @@ function initFirebase() {
     }
 }
 
+function showLastUpdated(date) {
+    const el = document.getElementById('lastUpdated');
+    if (el) {
+        el.textContent = `Last updated: ${date.toLocaleString()}`;
+    }
+}
+
 async function fetchCDF() {
     // 1. Try Firebase First
     if (db) {
@@ -352,6 +359,9 @@ async function fetchCDF() {
             if (docSnap.exists) {
                 console.log("Loaded items from Firebase!");
                 const data = docSnap.data();
+                if (data.updatedAt) {
+                    showLastUpdated(data.updatedAt.toDate());
+                }
                 if (data.items && data.items.length > 0) {
                     items = data.items;
                     renderItems(items);
@@ -553,6 +563,7 @@ function setupEventListeners() {
                                     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                                 });
                                 console.log("Successfully synced list to Firebase!");
+                                showLastUpdated(new Date());
                                 alert("List successfully imported and synced to the cloud!");
                             } catch(err) {
                                 console.error("Error syncing to Firebase:", err);
